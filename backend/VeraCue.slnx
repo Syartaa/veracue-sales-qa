@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="VeraCue.Api.Tests/VeraCue.Api.Tests.csproj" />
   <Project Path="VeraCue.Api/VeraCue.Api.csproj" />
 </Solution>

@@ -5,6 +5,7 @@ using VeraCue.Api.Data;
 using VeraCue.Api.Dev;
 using VeraCue.Api.Services.Evaluation;
 using VeraCue.Api.Services.Health;
+using VeraCue.Api.Services.Templates;
 using VeraCue.Api.Services.Transcription;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +29,11 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
         "dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"<value>\"");
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+
+// Feature services. Scoped = one instance per HTTP request, like the DbContext they use.
+// TimeProvider gives "now" in one replaceable place (tests can fake the clock).
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<TemplateService>();
 
 // Send enums as strings ("ReadyForReview", "Met"), matching the frontend's TypeScript types.
 // Set twice: controllers and minimal-API endpoints (Results.Ok) have separate JSON settings.
@@ -77,6 +83,24 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod()));
 
 var app = builder.Build();
+
+// ---------- Database migrations ----------
+// Production (Render) brings its database up to date on startup, so every deploy ships
+// code and schema together. Locally we run "dotnet ef database update" ourselves instead.
+// Override with APPLY_MIGRATIONS_ON_STARTUP=true/false if needed.
+var applyMigrations = app.Configuration.GetValue<bool?>("APPLY_MIGRATIONS_ON_STARTUP")
+    ?? !app.Environment.IsDevelopment();
+
+if (applyMigrations)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    app.Logger.LogInformation("Applying database migrations...");
+    // Safe to run every start: only migrations the database hasn't had yet are applied.
+    // If this fails, the app doesn't start, so Render keeps the previous version running.
+    await db.Database.MigrateAsync();
+    app.Logger.LogInformation("Database is up to date.");
+}
 
 // ---------- HTTP pipeline (order matters) ----------
 

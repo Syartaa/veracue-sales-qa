@@ -10,6 +10,67 @@ Accept: application/json
 ### OpenAPI document (Development only)
 GET {{baseUrl}}/openapi/v1.json
 
+### Provider reachability (Deepgram, Groq) — JSON
+GET {{baseUrl}}/api/health/providers
+
+### ---------- QA Templates ----------
+
+### List active templates (optional ?search=)
+GET {{baseUrl}}/api/templates?search=
+
+### Create a template — expect 201. Copy the "id" from the response into @templateId below.
+POST {{baseUrl}}/api/templates
+Content-Type: application/json
+
+{
+  "name": "Life Insurance Sales QA",
+  "description": "Full sales-call standard: greeting, discovery, product explanation, disclosures and close.",
+  "criteria": [
+    { "name": "Greeting & introduction", "maxPoints": 10,
+      "instructions": "Agent greets the customer, gives their own name and the company name within the first minute of the call." },
+    { "name": "Needs discovery", "maxPoints": 20,
+      "instructions": "Before recommending a policy, the agent asks about dependants, existing cover and monthly budget." },
+    { "name": "Cancellation policy explained", "maxPoints": 20,
+      "instructions": "The agent clearly explains the cancellation policy, including the cooling-off period. Judge the agent's explanation — the customer mentioning cancellation does not count." }
+  ]
+}
+
+### Invalid template — expect 400 with field errors (criteria[0].instructions, criteria[1].maxPoints)
+POST {{baseUrl}}/api/templates
+Content-Type: application/json
+
+{
+  "name": "Broken template",
+  "criteria": [
+    { "name": "Clear next steps & close", "maxPoints": 15, "instructions": "   " },
+    { "name": "Objection handling", "maxPoints": 0, "instructions": "Agent answers concerns." }
+  ]
+}
+
+@templateId = 00000000-0000-0000-0000-000000000000
+
+### Get one template
+GET {{baseUrl}}/api/templates/{{templateId}}
+
+### Save edits — criteria with an "id" are updated, without one are added, missing ones are deleted;
+### list order = new order. Paste real criterion ids from the GET response.
+PUT {{baseUrl}}/api/templates/{{templateId}}
+Content-Type: application/json
+
+{
+  "name": "Life Insurance Sales QA",
+  "description": "Updated description",
+  "criteria": [
+    { "id": "PASTE-CRITERION-ID", "name": "Greeting & introduction", "maxPoints": 10,
+      "instructions": "Agent greets the customer, gives their own name and the company name." },
+    { "name": "Objection handling", "maxPoints": 15,
+      "instructions": "When the customer raises a concern, the agent acknowledges it and answers it directly." }
+  ]
+}
+
+### Archive (never hard-deletes) — expect 204
+DELETE {{baseUrl}}/api/templates/{{templateId}}
+
 ### ---------- Phase 1b provider tests (Development only) ----------
 # Transcribe: run from PowerShell (multipart upload):
 #   curl.exe -F "file=@C:\path\to\test-call-01.mp3" http://localhost:5000/api/dev/transcribe
