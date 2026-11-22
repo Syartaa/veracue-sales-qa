@@ -1,6 +1,7 @@
 import { CloudUpload } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { ApiStatus } from '@/components/ApiStatus'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { PlaceholderCard } from '@/components/PlaceholderCard'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,9 @@ export function OverviewPage() {
       <div className="space-y-6">
         <PlaceholderCard phase={6}>
           <p>Summary cards (calls evaluated, average score, pending review, QA templates) and recent evaluations.</p>
+          <div className="pt-2">
+            <ApiStatus />
+          </div>
         </PlaceholderCard>
         <Button asChild size="lg">
           <Link to="/evaluate">
