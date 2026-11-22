@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using VeraCue.Api.Entities;
 
 namespace VeraCue.Api.Data;
 
@@ -9,6 +10,9 @@ namespace VeraCue.Api.Data;
 /// </summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<QaTemplate> QaTemplates => Set<QaTemplate>();
+    public DbSet<QaCriterion> QaCriteria => Set<QaCriterion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
