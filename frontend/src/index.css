@@ -51,70 +51,84 @@
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
 
-    /* VeraCue brand extras: `bg-sage`, `text-sage-foreground`, `bg-peach`, ... */
+    /* VeraCue brand extras, e.g. `bg-sage text-sage-foreground`, `text-heading` */
+    --color-heading: var(--heading);
+    --color-lavender: var(--lavender);
+    --color-lavender-strong: var(--lavender-strong);
     --color-sage: var(--sage);
     --color-sage-foreground: var(--sage-foreground);
     --color-peach: var(--peach);
     --color-peach-foreground: var(--peach-foreground);
+    --color-progress: var(--progress);
+    --color-progress-foreground: var(--progress-foreground);
+    --color-danger: var(--danger);
+    --color-danger-foreground: var(--danger-foreground);
+    --color-evidence: var(--evidence);
 }
 
 /*
- * VeraCue "Lavender & Sage" palette (light mode only).
- * Lavender = primary, Sage = secondary, Peach = attention/pending.
- * All text/background pairs below meet WCAG AA contrast (>= 4.5:1).
+ * VeraCue "Lavender & Sage" palette — values from the UI Page Specification.
+ * Light mode only. Every text/background pair meets WCAG AA (>= 4.5:1),
+ * except white text on --evidence (use it for markers/borders, not text backgrounds).
  */
 :root {
-    --radius: 0.875rem;
+    --radius: 0.75rem;                  /* 12px: buttons and inputs; cards use rounded-3xl */
 
-    /* Base surfaces and text */
-    --background: #fcf8fb;          /* soft lavender-cream page */
-    --foreground: #2e1a47;          /* deep plum text */
+    /* Page, surfaces and text */
+    --background: #faf7fb;              /* page background */
+    --foreground: #2a1745;              /* body text */
+    --heading: #2e1a47;                 /* titles and numbers */
     --card: #ffffff;
-    --card-foreground: #2e1a47;
+    --card-foreground: #2a1745;
     --popover: #ffffff;
-    --popover-foreground: #2e1a47;
+    --popover-foreground: #2a1745;
+    --muted: #f6f1f9;
+    --muted-foreground: #5e5470;        /* secondary text */
 
-    /* Lavender: main actions (buttons, links, active states) */
-    --primary: #7444c4;
+    /* Lavender — primary actions, links, active states */
+    --primary: #6f42b5;
     --primary-foreground: #ffffff;
+    --lavender: #efe6fa;                /* score pills, highlight cards */
+    --lavender-strong: #e3d4f4;         /* active nav item */
 
-    /* Sage: secondary actions and positive states (e.g. "Reviewed") */
-    --secondary: #e8f1e2;
-    --secondary-foreground: #3f6a35;
-    --sage: #e8f1e2;
-    --sage-foreground: #3f6a35;
+    /* shadcn "secondary" = the spec's tertiary button (lavender tint) */
+    --secondary: #efe6fa;
+    --secondary-foreground: #5b34a0;
+    --accent: #efe6fa;                  /* hover / selected backgrounds */
+    --accent-foreground: #5b34a0;
 
-    /* Peach: pending / needs-review states */
-    --peach: #fdeee0;
-    --peach-foreground: #a84e1a;
-
-    /* Neutral helpers */
-    --muted: #f4eef8;
-    --muted-foreground: #6b5f7a;
-    --accent: #efe6fa;              /* lavender tint for hover/selected */
-    --accent-foreground: #4b2a85;
-    --destructive: #c2413f;
+    /* Status colours */
+    --sage: #e3f0e1;                    /* Reviewed, Met, success */
+    --sage-foreground: #2f5e37;
+    --peach: #fdebdc;                   /* Ready for review, Partial */
+    --peach-foreground: #8a410c;
+    --progress: #ede3f8;                /* Transcribing / Evaluating */
+    --progress-foreground: #5b34a0;
+    --danger: #fbe4e4;                  /* Failed, validation errors */
+    --danger-foreground: #9e2a2a;
+    --destructive: #9e2a2a;
+    --evidence: #e07b3c;                /* evidence markers for the selected criterion */
 
     /* Borders, inputs, focus ring */
-    --border: #ece3f2;
-    --input: #e2d6ec;
+    --border: #efe7f5;
+    --input: #e2d7ec;
     --ring: #a98be0;
 
-    /* Charts (if used) */
-    --chart-1: #7444c4;
-    --chart-2: #8fb47f;
-    --chart-3: #f0a874;
-    --chart-4: #b9a2e6;
-    --chart-5: #4b2a85;
+    /* Charts (not planned, kept for shadcn compatibility) */
+    --chart-1: #6f42b5;
+    --chart-2: #2f5e37;
+    --chart-3: #e07b3c;
+    --chart-4: #e3d4f4;
+    --chart-5: #2e1a47;
 
     /* Sidebar navigation */
-    --sidebar: #f8f2fb;
-    --sidebar-foreground: #2e1a47;
-    --sidebar-primary: #7444c4;
+    --sidebar: #f3ecf8;
+    --sidebar-foreground: #2a1745;
+    --sidebar-primary: #6f42b5;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #ecdff8;
-    --sidebar-accent-foreground: #4b2a85;
-    --sidebar-border: #ece3f2;
+    --sidebar-accent: #e3d4f4;
+    --sidebar-accent-foreground: #2e1a47;
+    --sidebar-border: #e9dff2;
     --sidebar-ring: #a98be0;
 }
 
@@ -124,5 +138,8 @@
     }
     body {
         @apply bg-background font-sans text-foreground antialiased;
+    }
+    h1, h2, h3 {
+        @apply text-heading;
     }
 }
