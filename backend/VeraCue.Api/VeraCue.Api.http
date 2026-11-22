@@ -9,3 +9,33 @@ Accept: application/json
 
 ### OpenAPI document (Development only)
 GET {{baseUrl}}/openapi/v1.json
+
+### ---------- Phase 1b provider tests (Development only) ----------
+# Transcribe: run from PowerShell (multipart upload):
+#   curl.exe -F "file=@C:\path\to\test-call-01.mp3" http://localhost:5000/api/dev/transcribe
+# It saves dev-samples/test-call-01.transcript.json, used by the request below.
+
+### Evaluate the saved transcript with the test template (7 criteria)
+# Optional: add "model": "openai/gpt-oss-20b" to compare models.
+POST {{baseUrl}}/api/dev/evaluate
+Content-Type: application/json
+
+{
+  "transcriptFile": "test-call-01.transcript.json",
+  "criteria": [
+    { "criterionId": "c1", "name": "Greeting & introduction", "maxPoints": 10,
+      "instructions": "Agent greets the customer, gives their own name and the company name within the first minute of the call." },
+    { "criterionId": "c2", "name": "Needs discovery", "maxPoints": 20,
+      "instructions": "Before recommending a policy, the agent asks about dependants, existing cover and monthly budget." },
+    { "criterionId": "c3", "name": "Product explanation", "maxPoints": 20,
+      "instructions": "Agent explains the cover amount, term, premium and main exclusions in plain language." },
+    { "criterionId": "c4", "name": "Cancellation policy explained", "maxPoints": 20,
+      "instructions": "The agent clearly explains the cancellation policy, including the cooling-off period. Judge the agent's explanation — the customer mentioning cancellation does not count." },
+    { "criterionId": "c5", "name": "Objection handling", "maxPoints": 15,
+      "instructions": "When the customer raises a concern (price, need, timing), the agent acknowledges it and answers it directly." },
+    { "criterionId": "c6", "name": "Clear next steps & close", "maxPoints": 15,
+      "instructions": "Before the call ends, the agent agrees a concrete next step with the customer, such as a follow-up call date or sending documents." },
+    { "criterionId": "c7", "name": "Escalation to a supervisor", "maxPoints": 10,
+      "instructions": "If the customer asks to speak to a supervisor or manager, the agent offers to transfer them or arranges a callback." }
+  ]
+}

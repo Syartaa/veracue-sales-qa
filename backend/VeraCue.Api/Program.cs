@@ -1,6 +1,9 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using VeraCue.Api.Data;
+using VeraCue.Api.Dev;
+using VeraCue.Api.Services.Evaluation;
+using VeraCue.Api.Services.Transcription;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,10 +19,26 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
+// Send enums as strings ("ReadyForReview", "Met"), matching the frontend's TypeScript types.
+// Set twice: controllers and minimal-API endpoints (Results.Ok) have separate JSON settings.
 builder.Services
     .AddControllers()
-    // Send enums as strings ("ReadyForReview"), matching the frontend's TypeScript types.
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+// AI provider clients. Typed HttpClients: one configured client per provider,
+// created and pooled by IHttpClientFactory. API keys come from User Secrets / Render.
+builder.Services.AddHttpClient<DeepgramTranscriber>(client =>
+{
+    client.BaseAddress = new Uri("https://api.deepgram.com/");
+    client.Timeout = TimeSpan.FromMinutes(5); // long recordings take a while to transcribe
+});
+builder.Services.AddHttpClient<GroqEvaluator>(client =>
+{
+    client.BaseAddress = new Uri("https://api.groq.com/");
+    client.Timeout = TimeSpan.FromMinutes(2);
+});
 
 // OpenAPI description of the API (served in Development only, see below).
 builder.Services.AddOpenApi();
@@ -54,6 +73,7 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi(); // GET /openapi/v1.json
+    app.MapDevEndpoints(); // Phase 1b provider tests: /api/dev/transcribe, /api/dev/evaluate
 }
 
 // No UseHttpsRedirection: locally we use plain http, and on Render HTTPS is

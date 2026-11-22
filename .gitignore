@@ -30,6 +30,12 @@ TestResults/
 .DS_Store
 Thumbs.db
 
+# Local provider test outputs (transcripts, AI evaluations) and test recordings
+dev-samples/
+*.mp3
+*.m4a
+*.wav
+
 # Logs
 *.log
 logs/
