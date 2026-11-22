@@ -1,8 +1,20 @@
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using VeraCue.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------- Services ----------
+
+// PostgreSQL (Neon). The connection string is a secret: locally it comes from
+// .NET User Secrets, in production from Render's environment variables
+// (ConnectionStrings__DefaultConnection). It is never stored in appsettings or Git.
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException(
+        "Connection string 'DefaultConnection' is missing. Set it with: " +
+        "dotnet user-secrets set \"ConnectionStrings:DefaultConnection\" \"<value>\"");
+
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
 builder.Services
     .AddControllers()
@@ -16,8 +28,9 @@ builder.Services.AddOpenApi();
 // so the frontend can read every error the same way.
 builder.Services.AddProblemDetails();
 
-// /api/health endpoint. Database and provider checks are added here in later phases.
-builder.Services.AddHealthChecks();
+// /api/health endpoint: "Healthy" only when the API can also reach the database.
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("database");
 
 // CORS: only the VeraCue frontend may call this API from a browser.
 // FRONTEND_ORIGIN can hold several origins separated by commas (e.g. local + Vercel).
