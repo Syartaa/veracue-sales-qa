@@ -1,11 +1,21 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using VeraCue.Api.Data;
 using VeraCue.Api.Dev;
 using VeraCue.Api.Services.Evaluation;
+using VeraCue.Api.Services.Health;
 using VeraCue.Api.Services.Transcription;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Render tells the container which port to listen on via the PORT environment variable.
+// Locally PORT isn't set, so launchSettings.json (http://localhost:5000) is used instead.
+var renderPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(renderPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
+}
 
 // ---------- Services ----------
 
@@ -47,9 +57,13 @@ builder.Services.AddOpenApi();
 // so the frontend can read every error the same way.
 builder.Services.AddProblemDetails();
 
-// /api/health endpoint: "Healthy" only when the API can also reach the database.
+// Health checks, grouped by tag:
+//  "db"        -> GET /api/health            (Render's health check: API + database)
+//  "providers" -> GET /api/health/providers  (can this server reach Deepgram and Groq?)
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AppDbContext>("database");
+    .AddDbContextCheck<AppDbContext>("database", tags: ["db"])
+    .AddCheck<DeepgramHealthCheck>("deepgram", tags: ["providers"])
+    .AddCheck<GroqHealthCheck>("groq", tags: ["providers"]);
 
 // CORS: only the VeraCue frontend may call this API from a browser.
 // FRONTEND_ORIGIN can hold several origins separated by commas (e.g. local + Vercel).
@@ -83,6 +97,14 @@ app.UseCors();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/api/health");
+app.MapHealthChecks("/api/health", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("db"),
+});
+app.MapHealthChecks("/api/health/providers", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("providers"),
+    ResponseWriter = HealthResponseWriter.WriteJson,
+});
 
 app.Run();

@@ -59,6 +59,26 @@ public sealed class DeepgramTranscriber(HttpClient http, IConfiguration config)
         return new TranscriptionResult(Model, ToMs(parsed.Metadata.Duration), segments);
     }
 
+    /// <summary>
+    /// Cheap connectivity + key check (no audio, no credits used): lists the key's projects.
+    /// Throws <see cref="ProviderException"/> if Deepgram can't be reached or rejects the key.
+    /// </summary>
+    public async Task CheckConnectionAsync(CancellationToken cancellationToken)
+    {
+        var apiKey = config["DEEPGRAM_API_KEY"]
+            ?? throw new InvalidOperationException("DEEPGRAM_API_KEY is not configured.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "v1/projects");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Token", apiKey);
+
+        using var response = await http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ProviderException("Deepgram", (int)response.StatusCode,
+                await response.Content.ReadAsStringAsync(cancellationToken));
+        }
+    }
+
     private static int ToMs(double seconds) => (int)Math.Round(seconds * 1000);
 
     // Only the parts of Deepgram's response we use.

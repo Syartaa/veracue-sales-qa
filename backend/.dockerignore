@@ -1,0 +1,9 @@
+# Keep the Docker build context small and free of local files.
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/appsettings.Development.json
+**/*.http
+Dockerfile
+.dockerignore

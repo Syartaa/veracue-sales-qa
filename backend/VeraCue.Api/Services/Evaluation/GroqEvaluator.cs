@@ -140,6 +140,26 @@ public sealed class GroqEvaluator(HttpClient http, IConfiguration config)
             completion["usage"]?["completion_tokens"]?.GetValue<int>());
     }
 
+    /// <summary>
+    /// Cheap connectivity + key check (no tokens used): lists the available models.
+    /// Throws <see cref="ProviderException"/> on failure — e.g. 403 when Groq blocks the server's IP.
+    /// </summary>
+    public async Task CheckConnectionAsync(CancellationToken cancellationToken)
+    {
+        var apiKey = config["GROQ_API_KEY"]
+            ?? throw new InvalidOperationException("GROQ_API_KEY is not configured.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "openai/v1/models");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        using var response = await http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ProviderException("Groq", (int)response.StatusCode,
+                await response.Content.ReadAsStringAsync(cancellationToken));
+        }
+    }
+
     /// <summary>Criteria as JSON, then one transcript line per segment: [index] Speaker N (mm:ss): text</summary>
     private static string BuildUserMessage(
         IReadOnlyList<TranscriptSegment> segments, IReadOnlyList<CriterionInput> criteria)
