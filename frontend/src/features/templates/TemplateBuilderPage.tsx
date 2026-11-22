@@ -1,35 +1,50 @@
-import { Check } from 'lucide-react'
 import { Link, useParams } from 'react-router'
+import { ErrorState } from '@/components/ErrorState'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { PlaceholderCard } from '@/components/PlaceholderCard'
 import { Button } from '@/components/ui/button'
+import { ApiError } from '@/lib/api'
+import { useTemplate } from './api'
+import { TemplateForm } from './TemplateForm'
 
-// One page for both routes: /templates/new (create) and /templates/:templateId (edit).
+/**
+ * /templates/new  -> empty form
+ * /templates/:id  -> loads the template, then shows the same form filled in.
+ */
 export function TemplateBuilderPage() {
   const { templateId } = useParams()
   const isNew = templateId === 'new'
+  const { data: template, isPending, isError, error, refetch } = useTemplate(isNew ? undefined : templateId)
 
-  return (
-    <>
-      <PageHeader
-        back={{ to: '/templates', label: 'QA Templates' }}
-        title={isNew ? 'New template' : 'Edit template'}
-        description="Write each criterion as a clear instruction the AI can judge from the transcript."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link to="/templates">Cancel</Link>
+  if (isNew) return <TemplateForm />
+
+  if (isPending) {
+    return (
+      <>
+        <PageHeader back={{ to: '/templates', label: 'QA Templates' }} title="Edit template" />
+        <div className="h-96 animate-pulse rounded-3xl border bg-card" aria-busy="true" aria-label="Loading template" />
+      </>
+    )
+  }
+
+  if (isError) {
+    const notFound = error instanceof ApiError && error.status === 404
+    return (
+      <>
+        <PageHeader back={{ to: '/templates', label: 'QA Templates' }} title="Edit template" />
+        {notFound ? (
+          <section className="rounded-3xl border bg-card p-8 text-center">
+            <p className="font-semibold text-heading">This template doesn’t exist or was archived.</p>
+            <Button asChild variant="outline" className="mt-4">
+              <Link to="/templates">Back to QA Templates</Link>
             </Button>
-            <Button disabled>
-              <Check />
-              Save template
-            </Button>
-          </>
-        }
-      />
-      <PlaceholderCard phase={2}>
-        <p>Template details, criterion cards (name, max points, instructions), validation and the summary panel.</p>
-      </PlaceholderCard>
-    </>
-  )
+          </section>
+        ) : (
+          <ErrorState title="Couldn't load the template" error={error} onRetry={() => refetch()} />
+        )}
+      </>
+    )
+  }
+
+  // key: if the URL switches to another template, start a fresh form instead of reusing state.
+  return <TemplateForm key={template.id} template={template} />
 }
