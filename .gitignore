@@ -1,0 +1,35 @@
+# Frontend
+node_modules/
+dist/
+coverage/
+.vite/
+.vercel/
+
+# .NET
+**/bin/
+**/obj/
+.vs/
+TestResults/
+*.user
+*.suo
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/secrets.json
+*.pfx
+*.pem
+*.key
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
