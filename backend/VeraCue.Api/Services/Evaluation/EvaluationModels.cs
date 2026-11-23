@@ -1,17 +1,9 @@
+using VeraCue.Api.Entities;
+
 namespace VeraCue.Api.Services.Evaluation;
 
 /// <summary>A criterion as sent to the AI (snapshot of a QaCriteria row).</summary>
 public sealed record CriterionInput(string CriterionId, string Name, string Instructions, int MaxPoints);
-
-/// <summary>Outcome values — the same list as the CriterionResults.AiOutcome CHECK constraint.</summary>
-public enum CriterionOutcome
-{
-    Met,
-    Partial,
-    NotMet,
-    NotApplicable,
-    NeedsReview,
-}
 
 /// <summary>The AI's judgment for one criterion, exactly as the model returned it.</summary>
 public sealed record AiCriterionResult(

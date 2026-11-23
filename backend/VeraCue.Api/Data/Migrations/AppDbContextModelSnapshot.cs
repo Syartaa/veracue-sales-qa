@@ -124,6 +124,145 @@ namespace VeraCue.Api.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("VeraCue.Api.Entities.CriterionResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AiExplanation")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AiOutcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("AiScore")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("CriterionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EvaluationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FinalOutcome")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("FinalScore")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InstructionsSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("MaxPoints")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime?>("OverriddenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OverriddenByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OverrideReason")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CriterionId");
+
+                    b.HasIndex("OverriddenByUserId");
+
+                    b.HasIndex("EvaluationId", "CriterionId")
+                        .IsUnique()
+                        .HasFilter("\"CriterionId\" IS NOT NULL");
+
+                    b.HasIndex("EvaluationId", "SortOrder");
+
+                    b.ToTable("CriterionResults", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CriterionResults_AiOutcome", "\"AiOutcome\" IN ('Met', 'Partial', 'NotMet', 'NotApplicable', 'NeedsReview')");
+
+                            t.HasCheckConstraint("CK_CriterionResults_AiScore_MatchesOutcome", "(\"AiOutcome\" IN ('NotApplicable', 'NeedsReview')) = (\"AiScore\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_CriterionResults_AiScore_Range", "\"AiScore\" IS NULL OR (\"AiScore\" >= 0 AND \"AiScore\" <= \"MaxPoints\")");
+
+                            t.HasCheckConstraint("CK_CriterionResults_FinalOutcome", "\"FinalOutcome\" IS NULL OR \"FinalOutcome\" IN ('Met', 'Partial', 'NotMet', 'NotApplicable', 'NeedsReview')");
+
+                            t.HasCheckConstraint("CK_CriterionResults_FinalOutcome_IsDecision", "\"FinalOutcome\" IS NULL OR \"FinalOutcome\" <> 'NeedsReview'");
+
+                            t.HasCheckConstraint("CK_CriterionResults_FinalScore_MatchesOutcome", "(\"FinalOutcome\" IS NULL OR \"FinalOutcome\" = 'NotApplicable') = (\"FinalScore\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_CriterionResults_FinalScore_Range", "\"FinalScore\" IS NULL OR (\"FinalScore\" >= 0 AND \"FinalScore\" <= \"MaxPoints\")");
+
+                            t.HasCheckConstraint("CK_CriterionResults_MaxPoints_Positive", "\"MaxPoints\" > 0");
+
+                            t.HasCheckConstraint("CK_CriterionResults_Override_AllOrNothing", "(\"FinalOutcome\" IS NULL AND \"OverrideReason\" IS NULL AND \"OverriddenByUserId\" IS NULL AND \"OverriddenAt\" IS NULL) OR (\"FinalOutcome\" IS NOT NULL AND \"OverrideReason\" IS NOT NULL AND length(btrim(\"OverrideReason\")) > 0 AND \"OverriddenByUserId\" IS NOT NULL AND \"OverriddenAt\" IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("VeraCue.Api.Entities.Evaluation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CallId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CallId")
+                        .IsUnique();
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.ToTable("Evaluations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Evaluations_Reviewed_HasReviewer", "(\"ReviewedAt\" IS NULL) = (\"ReviewedByUserId\" IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("VeraCue.Api.Entities.QaCriterion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -197,6 +336,21 @@ namespace VeraCue.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_QaTemplates_Name_NotBlank", "length(btrim(\"Name\")) > 0");
                         });
+                });
+
+            modelBuilder.Entity("VeraCue.Api.Entities.ResultEvidence", b =>
+                {
+                    b.Property<Guid>("CriterionResultId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TranscriptSegmentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("CriterionResultId", "TranscriptSegmentId");
+
+                    b.HasIndex("TranscriptSegmentId");
+
+                    b.ToTable("ResultEvidence", (string)null);
                 });
 
             modelBuilder.Entity("VeraCue.Api.Entities.TranscriptSegment", b =>
@@ -298,6 +452,49 @@ namespace VeraCue.Api.Data.Migrations
                     b.Navigation("UploadedBy");
                 });
 
+            modelBuilder.Entity("VeraCue.Api.Entities.CriterionResult", b =>
+                {
+                    b.HasOne("VeraCue.Api.Entities.QaCriterion", "Criterion")
+                        .WithMany()
+                        .HasForeignKey("CriterionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("VeraCue.Api.Entities.Evaluation", "Evaluation")
+                        .WithMany("Results")
+                        .HasForeignKey("EvaluationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("VeraCue.Api.Entities.User", "OverriddenBy")
+                        .WithMany()
+                        .HasForeignKey("OverriddenByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Criterion");
+
+                    b.Navigation("Evaluation");
+
+                    b.Navigation("OverriddenBy");
+                });
+
+            modelBuilder.Entity("VeraCue.Api.Entities.Evaluation", b =>
+                {
+                    b.HasOne("VeraCue.Api.Entities.Call", "Call")
+                        .WithOne()
+                        .HasForeignKey("VeraCue.Api.Entities.Evaluation", "CallId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("VeraCue.Api.Entities.User", "ReviewedBy")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Call");
+
+                    b.Navigation("ReviewedBy");
+                });
+
             modelBuilder.Entity("VeraCue.Api.Entities.QaCriterion", b =>
                 {
                     b.HasOne("VeraCue.Api.Entities.QaTemplate", "Template")
@@ -307,6 +504,25 @@ namespace VeraCue.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("VeraCue.Api.Entities.ResultEvidence", b =>
+                {
+                    b.HasOne("VeraCue.Api.Entities.CriterionResult", "CriterionResult")
+                        .WithMany("Evidence")
+                        .HasForeignKey("CriterionResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("VeraCue.Api.Entities.TranscriptSegment", "TranscriptSegment")
+                        .WithMany()
+                        .HasForeignKey("TranscriptSegmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CriterionResult");
+
+                    b.Navigation("TranscriptSegment");
                 });
 
             modelBuilder.Entity("VeraCue.Api.Entities.TranscriptSegment", b =>
@@ -323,6 +539,16 @@ namespace VeraCue.Api.Data.Migrations
             modelBuilder.Entity("VeraCue.Api.Entities.Call", b =>
                 {
                     b.Navigation("Segments");
+                });
+
+            modelBuilder.Entity("VeraCue.Api.Entities.CriterionResult", b =>
+                {
+                    b.Navigation("Evidence");
+                });
+
+            modelBuilder.Entity("VeraCue.Api.Entities.Evaluation", b =>
+                {
+                    b.Navigation("Results");
                 });
 
             modelBuilder.Entity("VeraCue.Api.Entities.QaTemplate", b =>

@@ -1,3 +1,5 @@
+using VeraCue.Api.Entities;
+
 namespace VeraCue.Api.Services.Evaluation;
 
 /// <summary>

@@ -15,6 +15,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<User> Users => Set<User>();
     public DbSet<Call> Calls => Set<Call>();
     public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
+    public DbSet<Evaluation> Evaluations => Set<Evaluation>();
+    public DbSet<CriterionResult> CriterionResults => Set<CriterionResult>();
+    public DbSet<ResultEvidence> ResultEvidence => Set<ResultEvidence>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
