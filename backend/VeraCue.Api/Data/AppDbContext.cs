@@ -12,6 +12,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<QaTemplate> QaTemplates => Set<QaTemplate>();
     public DbSet<QaCriterion> QaCriteria => Set<QaCriterion>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Call> Calls => Set<Call>();
+    public DbSet<TranscriptSegment> TranscriptSegments => Set<TranscriptSegment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

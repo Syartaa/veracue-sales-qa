@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using VeraCue.Api.Data;
 using VeraCue.Api.Dev;
+using VeraCue.Api.Services.Calls;
 using VeraCue.Api.Services.Evaluation;
 using VeraCue.Api.Services.Health;
 using VeraCue.Api.Services.Storage;
@@ -38,6 +39,13 @@ builder.Services.AddScoped<TemplateService>();
 
 // Private recording storage on a persistent disk (Render Disk in production).
 builder.Services.AddSingleton<AudioStorage>();
+
+// Calls: upload/status service, plus the background pipeline that transcribes them.
+// Queue = singleton (one shared list); worker = hosted service that runs for the app's lifetime.
+builder.Services.AddScoped<CallService>();
+builder.Services.AddScoped<CallProcessor>();
+builder.Services.AddSingleton<CallProcessingQueue>();
+builder.Services.AddHostedService<CallProcessingWorker>();
 
 // Send enums as strings ("ReadyForReview", "Met"), matching the frontend's TypeScript types.
 // Set twice: controllers and minimal-API endpoints (Results.Ok) have separate JSON settings.
@@ -106,6 +114,9 @@ if (applyMigrations)
     await db.Database.MigrateAsync();
     app.Logger.LogInformation("Database is up to date.");
 }
+
+// The demo manager account (needed as the uploader of every call until sign-in exists).
+await DemoUserSeeder.SeedAsync(app.Services, app.Configuration, app.Logger);
 
 // ---------- HTTP pipeline (order matters) ----------
 
