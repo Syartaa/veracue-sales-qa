@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using VeraCue.Api.Data;
 using VeraCue.Api.DTOs.Calls;
 using VeraCue.Api.Entities;
+using VeraCue.Api.Services.Scoring;
 using VeraCue.Api.Services.Storage;
 
 namespace VeraCue.Api.Services.Calls;
@@ -78,7 +79,28 @@ public sealed class CallService(
         return (await GetAsync(call.Id, ct))!;
     }
 
-    public Task<CallDetailDto?> GetAsync(Guid id, CancellationToken ct) =>
+    /// <summary>A call's details, plus its calculated scores once it has been evaluated.</summary>
+    public async Task<CallDetailDto?> GetAsync(Guid id, CancellationToken ct)
+    {
+        var call = await GetBasicAsync(id, ct);
+        if (call is null) return null;
+
+        var inputs = await db.CriterionResults.AsNoTracking()
+            .Where(r => r.Evaluation.CallId == id)
+            .Select(r => new ScoreInput(r.MaxPoints, r.AiOutcome, r.AiScore, r.FinalOutcome, r.FinalScore))
+            .ToListAsync(ct);
+        if (inputs.Count == 0) return call;
+
+        var score = ScoreCalculator.Calculate(inputs);
+        return call with
+        {
+            AiScorePercent = score.Ai.Percent,
+            CurrentScorePercent = score.Current.Percent,
+            PendingCount = score.PendingCount,
+        };
+    }
+
+    private Task<CallDetailDto?> GetBasicAsync(Guid id, CancellationToken ct) =>
         db.Calls.AsNoTracking()
             .Where(c => c.Id == id)
             .Select(c => new CallDetailDto(
@@ -97,6 +119,18 @@ public sealed class CallService(
                 c.UploadedAt,
                 c.UpdatedAt))
             .FirstOrDefaultAsync(ct);
+
+    /// <summary>Where the call's recording is stored and its type, or null if the call or file doesn't exist.</summary>
+    public async Task<(string FullPath, string ContentType)?> GetAudioAsync(Guid id, CancellationToken ct)
+    {
+        var audio = await db.Calls.AsNoTracking()
+            .Where(c => c.Id == id)
+            .Select(c => new { c.AudioStorageKey, c.ContentType })
+            .FirstOrDefaultAsync(ct);
+
+        if (audio is null || !storage.Exists(audio.AudioStorageKey)) return null;
+        return (storage.GetFullPath(audio.AudioStorageKey), audio.ContentType);
+    }
 
     /// <summary>
     /// Restarts a failed call at the stage that failed: a failed transcription goes back to

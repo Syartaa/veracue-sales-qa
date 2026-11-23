@@ -1,23 +1,32 @@
 import { ArrowRight, CircleAlert, FileAudio, RotateCw } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ErrorState } from '@/components/ErrorState'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { PlaceholderCard } from '@/components/PlaceholderCard'
 import { StatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
 import { formatDuration, formatTime } from '@/lib/format'
 import { useCall, useRetryCall, type CallDetail } from './api'
+import { ResultsPreview } from './components/ResultsPreview'
 import { StageTiles } from './components/StageTiles'
 
 /**
  * /calls/:callId
  *  - while processing or failed: the Processing status (UI spec screen 5)
- *  - when ready: the Evaluation Review (Phase 5)
+ *  - when it finishes while you watch: the "Ready" card with "Open review"
+ *  - when opened for an already-finished call: the review straight away
  */
 export function CallDetailsPage() {
   const { callId } = useParams()
   const { data: call, isPending, isError, error, refetch } = useCall(callId)
+  const [sawProcessing, setSawProcessing] = useState(false)
+  const [reviewOpened, setReviewOpened] = useState(false)
+
+  const isFinished = call?.status === 'ReadyForReview' || call?.status === 'Reviewed'
+  // Remember that this visit started while the call was still processing (or failed),
+  // so finishing shows the "Ready" card instead of jumping away from the progress view.
+  if (call && !isFinished && !sawProcessing) setSawProcessing(true)
 
   if (isPending) {
     return (
@@ -47,21 +56,24 @@ export function CallDetailsPage() {
     )
   }
 
-  if (call.status === 'ReadyForReview' || call.status === 'Reviewed') {
+  if (isFinished && (reviewOpened || !sawProcessing)) {
     return (
       <>
-        <PageHeader back={{ to: '/calls', label: 'Call History' }} title={call.title} />
-        <PlaceholderCard phase={5}>
-          <p>Evaluation Review: transcript, scorecard with evidence, audio player and overrides.</p>
-        </PlaceholderCard>
+        <PageHeader
+          back={{ to: '/calls', label: 'Call History' }}
+          title={call.title}
+          description={`${call.templateName}${call.durationMs ? ` · ${formatDuration(call.durationMs)}` : ''}`}
+          actions={<StatusChip status={call.status} />}
+        />
+        <ResultsPreview callId={call.id} />
       </>
     )
   }
 
-  return <ProcessingView call={call} />
+  return <ProcessingView call={call} onOpenReview={() => setReviewOpened(true)} />
 }
 
-function ProcessingView({ call }: { call: CallDetail }) {
+function ProcessingView({ call, onOpenReview }: { call: CallDetail; onOpenReview: () => void }) {
   const retry = useRetryCall(call.id)
   const failed = call.status === 'Failed'
   const stageName = call.failedStage === 'Evaluation' ? 'evaluation' : 'transcription'
@@ -117,6 +129,30 @@ function ProcessingView({ call }: { call: CallDetail }) {
               {retry.isPending ? 'Retrying…' : `Retry ${stageName}`}
             </Button>
             {retry.isError && <p className="text-sm text-danger-foreground">Couldn’t start the retry. Try again.</p>}
+          </div>
+        )}
+
+        {call.status === 'ReadyForReview' && (
+          <div className="flex flex-col gap-4 rounded-2xl border border-peach-foreground/15 bg-peach/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-baseline gap-3">
+                <span className="text-4xl font-extrabold text-heading">
+                  {call.aiScorePercent !== null ? `${call.aiScorePercent}%` : '—'}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  AI score
+                  {call.pendingCount > 0 &&
+                    ` · ${call.pendingCount} ${call.pendingCount === 1 ? 'criterion needs' : 'criteria need'} your decision`}
+                </span>
+              </p>
+              <p className="mt-1 text-sm text-foreground">
+                All stages finished. Check the evidence and confirm or override each score.
+              </p>
+            </div>
+            <Button onClick={onOpenReview} size="lg" className="shrink-0">
+              Open review
+              <ArrowRight />
+            </Button>
           </div>
         )}
 

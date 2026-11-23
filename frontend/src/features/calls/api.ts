@@ -21,6 +21,76 @@ export type CallDetail = {
   speakerCount: number
   uploadedAt: string
   updatedAt: string
+  aiScorePercent: number | null
+  currentScorePercent: number | null
+  pendingCount: number
+}
+
+// ---------- Review (GET /api/calls/{id}/review) ----------
+
+export type CriterionOutcome = 'Met' | 'Partial' | 'NotMet' | 'NotApplicable' | 'NeedsReview'
+
+export type TranscriptSegment = {
+  id: string
+  index: number
+  speaker: number
+  startMs: number
+  endMs: number
+  text: string
+  confidence: number | null
+}
+
+export type Evidence = { segmentId: string; segmentIndex: number; startMs: number; speaker: number }
+
+export type CriterionResult = {
+  id: string
+  sortOrder: number
+  name: string
+  instructions: string
+  maxPoints: number
+  aiOutcome: CriterionOutcome
+  aiScore: number | null
+  aiExplanation: string
+  finalOutcome: CriterionOutcome | null
+  finalScore: number | null
+  overrideReason: string | null
+  overriddenByName: string | null
+  overriddenAt: string | null
+  evidence: Evidence[]
+}
+
+export type Score = {
+  aiAchieved: number
+  aiAvailable: number
+  aiPercent: number | null
+  currentAchieved: number
+  currentAvailable: number
+  currentPercent: number | null
+  pendingPoints: number
+  pendingCount: number
+  overrideCount: number
+  metCount: number
+  partialCount: number
+  notMetCount: number
+  notApplicableCount: number
+  canMarkReviewed: boolean
+}
+
+export type CallReview = {
+  call: CallDetail
+  agentSpeaker: number | null
+  transcript: TranscriptSegment[]
+  evaluation: {
+    id: string
+    templateName: string
+    modelName: string
+    promptVersion: string
+    createdAt: string
+    reviewedAt: string | null
+    reviewedByName: string | null
+    score: Score
+    results: CriterionResult[]
+  } | null
 }
 
 export type UploadCallInput = {
@@ -36,6 +106,16 @@ export const IN_PROGRESS: CallStatus[] = ['Uploaded', 'Transcribing', 'Transcrib
 export const callKeys = {
   all: ['calls'] as const,
   detail: (id: string) => ['calls', 'detail', id] as const,
+  review: (id: string) => ['calls', 'review', id] as const,
+}
+
+/** Transcript, AI results with evidence and scores. Read-only: never re-runs the AI. */
+export function useCallReview(id: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: callKeys.review(id ?? ''),
+    queryFn: () => apiFetch<CallReview>(`/api/calls/${id}/review`),
+    enabled: !!id && enabled,
+  })
 }
 
 // ---------- Hooks ----------

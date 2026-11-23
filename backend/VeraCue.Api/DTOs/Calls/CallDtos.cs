@@ -29,4 +29,7 @@ public sealed record CallDetailDto(
     int SegmentCount,
     int SpeakerCount,
     DateTime UploadedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    int? AiScorePercent = null,      // original AI score in %, once evaluated (null if nothing scorable)
+    int? CurrentScorePercent = null, // score after overrides, in %
+    int PendingCount = 0);           // criteria still waiting for a manager's decision

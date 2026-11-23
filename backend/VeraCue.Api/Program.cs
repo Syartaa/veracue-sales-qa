@@ -2,7 +2,6 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using VeraCue.Api.Data;
-using VeraCue.Api.Dev;
 using VeraCue.Api.Services.Calls;
 using VeraCue.Api.Services.Evaluation;
 using VeraCue.Api.Services.Health;
@@ -43,6 +42,7 @@ builder.Services.AddSingleton<AudioStorage>();
 // Calls: upload/status service, plus the background pipeline that transcribes them.
 // Queue = singleton (one shared list); worker = hosted service that runs for the app's lifetime.
 builder.Services.AddScoped<CallService>();
+builder.Services.AddScoped<ReviewService>();
 builder.Services.AddScoped<CallProcessor>();
 builder.Services.AddSingleton<CallProcessingQueue>();
 builder.Services.AddHostedService<CallProcessingWorker>();
@@ -127,7 +127,6 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi(); // GET /openapi/v1.json
-    app.MapDevEndpoints(); // Phase 1b provider tests: /api/dev/transcribe, /api/dev/evaluate
 }
 
 // No UseHttpsRedirection: locally we use plain http, and on Render HTTPS is
