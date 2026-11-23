@@ -31,8 +31,10 @@ public sealed class GroqEvaluator(HttpClient http, IConfiguration config)
 
         Rules:
         1. Judge the sales agent's behaviour. First decide which speaker number is the agent
-           (the person selling) and return it as agentSpeaker. Something the customer says
-           never proves that the agent did something.
+           (the person selling) and return it as agentSpeaker. Speaker labels come from
+           automatic diarization and can be wrong (for example, both people labelled as the
+           same speaker), so use what is said to tell the agent and the customer apart.
+           Something the customer says never proves that the agent did something.
         2. Return exactly one result per criterion, using its criterionId.
         3. Outcomes:
            - Met: the agent clearly did what the instructions require.
@@ -44,8 +46,9 @@ public sealed class GroqEvaluator(HttpClient http, IConfiguration config)
            (NotMet is normally 0). Use null for NotApplicable and NeedsReview.
         5. evidenceSegments: the [segment numbers] that directly support your judgment.
            Use only numbers that appear in the transcript; prefer the agent's own lines.
-           Met and Partial must cite at least one segment. For NotMet, cite segments that
-           show the gap if there are any, otherwise leave it empty. NotApplicable: empty.
+           Met and Partial must cite at least one segment. For NotMet, cite the segments that
+           show the gap (e.g. where the step should have happened, or the end of the call).
+           NotApplicable: empty.
         6. explanation: one to three plain sentences about what the agent said or failed to
            say. Do not invent quotes.
         7. Do not use outside knowledge about the company or product.

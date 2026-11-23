@@ -40,7 +40,8 @@ public sealed class CallProcessingWorker(
     }
 
     /// <summary>
-    /// A call left "Transcribing" means the server stopped mid-way: put it back to "Uploaded".
+    /// A call left "Transcribing" or "Evaluating" means the server stopped mid-way: put it back
+    /// to the stage before ("Uploaded" / "Transcribed" — the saved transcript is kept).
     /// Then queue every call that is waiting for work, oldest first.
     /// </summary>
     private async Task RecoverUnfinishedCallsAsync(CancellationToken ct)
@@ -55,9 +56,14 @@ public sealed class CallProcessingWorker(
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(c => c.Status, CallStatus.Uploaded)
                     .SetProperty(c => c.UpdatedAt, DateTime.UtcNow), ct);
+            interrupted += await db.Calls
+                .Where(c => c.Status == CallStatus.Evaluating)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(c => c.Status, CallStatus.Transcribed)
+                    .SetProperty(c => c.UpdatedAt, DateTime.UtcNow), ct);
 
             var waiting = await db.Calls
-                .Where(c => c.Status == CallStatus.Uploaded)
+                .Where(c => c.Status == CallStatus.Uploaded || c.Status == CallStatus.Transcribed)
                 .OrderBy(c => c.UploadedAt)
                 .Select(c => c.Id)
                 .ToListAsync(ct);
