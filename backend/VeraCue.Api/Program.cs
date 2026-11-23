@@ -5,6 +5,7 @@ using VeraCue.Api.Data;
 using VeraCue.Api.Dev;
 using VeraCue.Api.Services.Evaluation;
 using VeraCue.Api.Services.Health;
+using VeraCue.Api.Services.Storage;
 using VeraCue.Api.Services.Templates;
 using VeraCue.Api.Services.Transcription;
 
@@ -34,6 +35,9 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connect
 // TimeProvider gives "now" in one replaceable place (tests can fake the clock).
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TemplateService>();
+
+// Private recording storage on a persistent disk (Render Disk in production).
+builder.Services.AddSingleton<AudioStorage>();
 
 // Send enums as strings ("ReadyForReview", "Met"), matching the frontend's TypeScript types.
 // Set twice: controllers and minimal-API endpoints (Results.Ok) have separate JSON settings.
@@ -69,7 +73,8 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("database", tags: ["db"])
     .AddCheck<DeepgramHealthCheck>("deepgram", tags: ["providers"])
-    .AddCheck<GroqHealthCheck>("groq", tags: ["providers"]);
+    .AddCheck<GroqHealthCheck>("groq", tags: ["providers"])
+    .AddCheck<StorageHealthCheck>("storage", tags: ["providers"]);
 
 // CORS: only the VeraCue frontend may call this API from a browser.
 // FRONTEND_ORIGIN can hold several origins separated by commas (e.g. local + Vercel).

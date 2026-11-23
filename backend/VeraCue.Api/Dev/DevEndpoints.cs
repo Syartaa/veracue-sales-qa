@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using VeraCue.Api.Services;
 using VeraCue.Api.Services.Evaluation;
+using VeraCue.Api.Services.Storage;
 using VeraCue.Api.Services.Transcription;
 
 namespace VeraCue.Api.Dev;
@@ -39,6 +40,31 @@ public static class DevEndpoints
             {
                 return Results.Problem(ex.Message, statusCode: 500, title: "Configuration error");
             }
+        });
+
+        // POST /api/dev/storage-test — round trip: save a tiny file, read it back, delete it.
+        group.MapPost("/storage-test", async (AudioStorage storage, CancellationToken ct) =>
+        {
+            var key = storage.KeyForCall(Guid.CreateVersion7(), "storage-test.txt");
+            var content = $"VeraCue storage test {DateTime.UtcNow:O}";
+
+            await using (var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content)))
+                await storage.SaveAsync(key, stream, ct);
+
+            string readBack;
+            await using (var file = storage.OpenRead(key))
+            using (var reader = new StreamReader(file))
+                readBack = await reader.ReadToEndAsync(ct);
+
+            await storage.DeleteAsync(key, ct);
+
+            return Results.Ok(new
+            {
+                key,
+                savedAndReadBack = readBack == content,
+                deleted = !storage.Exists(key),
+                fullPath = storage.GetFullPath(key),
+            });
         });
 
         // POST /api/dev/transcribe  (multipart form, field "file")

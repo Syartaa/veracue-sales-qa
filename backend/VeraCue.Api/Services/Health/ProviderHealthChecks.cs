@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using VeraCue.Api.Services.Evaluation;
+using VeraCue.Api.Services.Storage;
 using VeraCue.Api.Services.Transcription;
 
 namespace VeraCue.Api.Services.Health;
@@ -31,6 +32,23 @@ public sealed class GroqHealthCheck(GroqEvaluator groq) : IHealthCheck
         {
             await groq.CheckConnectionAsync(cancellationToken);
             return HealthCheckResult.Healthy("Reachable, API key accepted.");
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy(ex.Message);
+        }
+    }
+}
+
+/// <summary>Is the recordings disk mounted and writable by the app?</summary>
+public sealed class StorageHealthCheck(AudioStorage storage) : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await storage.CheckWritableAsync(cancellationToken);
+            return HealthCheckResult.Healthy("Recording storage is writable.");
         }
         catch (Exception ex)
         {

@@ -32,6 +32,7 @@ Thumbs.db
 
 # Local provider test outputs (transcripts, AI evaluations) and test recordings
 dev-samples/
+local-audio/
 *.mp3
 *.m4a
 *.wav
