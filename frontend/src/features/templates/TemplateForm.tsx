@@ -202,7 +202,7 @@ export function TemplateForm({ template }: TemplateFormProps) {
         }
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] [&>*]:min-w-0">
         <form id="template-form" onSubmit={handleSubmit} noValidate className="space-y-6">
           {generalError && <ErrorState title="Couldn't save the template" error={generalError} />}
 

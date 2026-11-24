@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { initials, useSession } from '@/lib/session'
+import { usePageTitle } from '@/lib/use-page-title'
 
 type PageHeaderProps = {
   title: string
@@ -18,6 +19,7 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, description, eyebrow, back, actions, profile = 'compact' }: PageHeaderProps) {
   const user = useSession()?.user // the signed-in manager, from the session
+  usePageTitle(title)
 
   return (
     <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

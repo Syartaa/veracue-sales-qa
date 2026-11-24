@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ApiError, login } from '@/lib/api'
 import { saveSession, useSession } from '@/lib/session'
+import { usePageTitle } from '@/lib/use-page-title'
 
 const highlights = [
   { title: 'Templates', text: 'Your criteria, your points', className: 'text-primary' },
@@ -33,6 +34,7 @@ export function SignInPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
+  usePageTitle('Sign in')
 
   if (session) return <Navigate to={returnTo} replace />
 

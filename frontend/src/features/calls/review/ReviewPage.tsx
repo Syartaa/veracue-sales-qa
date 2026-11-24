@@ -85,7 +85,7 @@ export function ReviewPage({ callId }: { callId: string }) {
         onTimeChange={handleTimeChange}
       />
 
-      <div className="grid items-start gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2 [&>*]:min-w-0">
         <TranscriptPanel
           transcript={review.transcript}
           agentSpeaker={review.agentSpeaker}

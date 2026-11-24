@@ -5,9 +5,10 @@ import { ErrorState } from '@/components/ErrorState'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ApiError } from '@/lib/api'
 import { plural } from '@/lib/format'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
-import { useTemplates } from './api'
+import { useRestoreTemplate, useTemplates } from './api'
 import { CreateTemplateCard } from './components/CreateTemplateCard'
 import { TemplateCard } from './components/TemplateCard'
 
@@ -16,8 +17,14 @@ export function TemplatesPage() {
   const notice = (useLocation().state as { notice?: string } | null)?.notice
   const [showNotice, setShowNotice] = useState(true)
   const [search, setSearch] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const debouncedSearch = useDebouncedValue(search.trim())
-  const { data: templates, isPending, isError, error, refetch, isFetching } = useTemplates(debouncedSearch)
+  const { data: templates, isPending, isError, error, refetch, isFetching } = useTemplates(debouncedSearch, showArchived)
+  const restore = useRestoreTemplate()
+  const restoreError =
+    restore.error instanceof ApiError
+      ? (restore.error.problem?.errors?.name?.[0] ?? restore.error.message)
+      : restore.error ? 'Restoring failed.' : undefined
 
   return (
     <>
@@ -66,11 +73,36 @@ export function TemplatesPage() {
         </div>
         {templates && (
           <p className="text-sm text-muted-foreground" aria-live="polite">
-            {plural(templates.length, 'template')}
+            {plural(templates.length, showArchived ? 'archived template' : 'template')}
             {isFetching && !isPending ? ' · updating…' : ''}
           </p>
         )}
+        {/* Active / Archived switch (two toggle buttons) */}
+        <div className="flex rounded-xl border bg-card p-1 sm:ml-auto" role="group" aria-label="Show templates">
+          {[false, true].map((archived) => (
+            <button
+              key={String(archived)}
+              type="button"
+              aria-pressed={showArchived === archived}
+              onClick={() => {
+                setShowArchived(archived)
+                restore.reset()
+              }}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                showArchived === archived ? 'bg-lavender text-primary' : 'text-muted-foreground hover:text-heading'
+              }`}
+            >
+              {archived ? 'Archived' : 'Active'}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {restoreError && (
+        <p role="alert" className="mb-6 rounded-2xl bg-danger px-4 py-3 text-sm font-medium text-danger-foreground">
+          Couldn’t restore: {restoreError} Rename or archive the active template with that name first.
+        </p>
+      )}
 
       {isPending ? (
         <LoadingGrid />
@@ -78,13 +110,23 @@ export function TemplatesPage() {
         <ErrorState title="Couldn't load templates" error={error} onRetry={() => refetch()} />
       ) : templates.length === 0 && debouncedSearch ? (
         <EmptySearch search={debouncedSearch} onClear={() => setSearch('')} />
+      ) : templates.length === 0 && showArchived ? (
+        <section className="rounded-3xl border bg-card p-8 text-center text-sm text-muted-foreground">
+          No archived templates. Archiving a template (in its editor) moves it here; nothing is ever deleted.
+        </section>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {templates.map((template, index) => (
-            <TemplateCard key={template.id} template={template} index={index} />
+            <TemplateCard
+              key={template.id}
+              template={template}
+              index={index}
+              onRestore={showArchived ? () => restore.mutate(template.id) : undefined}
+              restoring={restore.isPending && restore.variables === template.id}
+            />
           ))}
           {/* With no templates yet, this tile is the empty state and the call to action. */}
-          {!debouncedSearch && <CreateTemplateCard />}
+          {!debouncedSearch && !showArchived && <CreateTemplateCard />}
         </div>
       )}
     </>

@@ -138,6 +138,9 @@
     }
     body {
         @apply bg-background font-sans text-foreground antialiased;
+        /* Safety net: nothing may make the page wider than the screen on phones
+           (wide tables scroll inside their own box instead). "clip" keeps sticky headers working. */
+        overflow-x: clip;
     }
     h1, h2, h3 {
         @apply text-heading;

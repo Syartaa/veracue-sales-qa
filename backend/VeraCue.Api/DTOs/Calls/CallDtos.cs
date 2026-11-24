@@ -44,6 +44,14 @@ public sealed record CallListItemDto(
 
 public sealed record CallListDto(IReadOnlyList<CallListItemDto> Items, int Total, int Page, int PageSize);
 
+/// <summary>The Overview page: summary cards and the most recent calls.</summary>
+public sealed record OverviewDto(
+    int CallsEvaluated,     // calls with AI results (ready for review or reviewed), all time
+    int? AverageScore,      // average current score of REVIEWED calls only (null if none yet)
+    int PendingReview,      // calls waiting for a manager ("Ready for review")
+    int Templates,          // active QA templates
+    IReadOnlyList<CallListItemDto> Recent);
+
 /// <summary>A call and its processing state, for the Processing page (and later Call History).</summary>
 public sealed record CallDetailDto(
     Guid Id,

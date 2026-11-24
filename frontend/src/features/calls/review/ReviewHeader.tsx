@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { StatusChip } from '@/components/StatusChip'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDuration, formatTime, plural } from '@/lib/format'
+import { usePageTitle } from '@/lib/use-page-title'
 import type { CallReview } from '../api'
 
 type ReviewHeaderProps = {
@@ -16,6 +17,7 @@ type ReviewHeaderProps = {
 export function ReviewHeader({ review, onMarkReviewed, marking, error }: ReviewHeaderProps) {
   const { call, evaluation } = review
   const score = evaluation?.score
+  usePageTitle(call.title)
   const reviewed = call.status === 'Reviewed'
 
   const chips = [

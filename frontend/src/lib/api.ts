@@ -76,8 +76,3 @@ export function login(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   })
 }
-
-/** GET /api/health — resolves to "Healthy" when the backend is up. */
-export function checkHealth() {
-  return apiFetch<string>('/api/health', { headers: { Accept: 'text/plain' } })
-}

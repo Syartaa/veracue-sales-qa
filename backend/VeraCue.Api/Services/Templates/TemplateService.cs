@@ -16,9 +16,9 @@ public sealed class TemplateService(AppDbContext db, TimeProvider time)
     private const string NameTakenMessage = "An active template with this name already exists.";
 
     /// <summary>Active templates, newest change first; optional search in name and description.</summary>
-    public async Task<IReadOnlyList<TemplateSummaryDto>> ListAsync(string? search, CancellationToken ct)
+    public async Task<IReadOnlyList<TemplateSummaryDto>> ListAsync(string? search, CancellationToken ct, bool archived = false)
     {
-        var query = db.QaTemplates.AsNoTracking().Where(t => !t.IsArchived);
+        var query = db.QaTemplates.AsNoTracking().Where(t => t.IsArchived == archived);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -154,6 +154,24 @@ public sealed class TemplateService(AppDbContext db, TimeProvider time)
     }
 
     /// <summary>Archives (soft-deletes) a template. False if not found or already archived.</summary>
+    /// <summary>
+    /// Makes an archived template active again. Fails with 409 if an active template has taken
+    /// its name in the meantime (names are unique among active templates). Null if not found.
+    /// </summary>
+    public async Task<TemplateDetailDto?> RestoreAsync(Guid id, CancellationToken ct)
+    {
+        var template = await db.QaTemplates
+            .Include(t => t.Criteria)
+            .FirstOrDefaultAsync(t => t.Id == id && t.IsArchived, ct);
+        if (template is null) return null;
+
+        await EnsureNameAvailableAsync(template.Name, excludeId: id, ct);
+        template.IsArchived = false;
+        template.UpdatedAt = time.GetUtcNow().UtcDateTime;
+        await SaveAsync(ct);
+        return ToDetail(template);
+    }
+
     public async Task<bool> ArchiveAsync(Guid id, CancellationToken ct)
     {
         var template = await db.QaTemplates.FirstOrDefaultAsync(t => t.Id == id && !t.IsArchived, ct);

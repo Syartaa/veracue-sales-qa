@@ -15,9 +15,10 @@ public class TemplatesController(TemplateService templates) : ControllerBase
     /// <summary>GET /api/templates?search=... — active templates for the QA Templates page.</summary>
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TemplateSummaryDto>>> List(
-        [FromQuery] string? search, CancellationToken ct)
+        [FromQuery] string? search, CancellationToken ct, [FromQuery] bool archived = false)
     {
-        return Ok(await templates.ListAsync(search, ct));
+        // ?archived=true lists archived templates instead of active ones.
+        return Ok(await templates.ListAsync(search, ct, archived));
     }
 
     /// <summary>GET /api/templates/{id} — one template for the Template Builder.</summary>
@@ -57,6 +58,21 @@ public class TemplatesController(TemplateService templates) : ControllerBase
         {
             var updated = await templates.UpdateAsync(id, request, ct);
             return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (TemplateRequestException ex)
+        {
+            return FieldError(ex);
+        }
+    }
+
+    /// <summary>POST /api/templates/{id}/restore — makes an archived template active again. 200, 404, 409 name taken.</summary>
+    [HttpPost("{id:guid}/restore")]
+    public async Task<ActionResult<TemplateDetailDto>> Restore(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            var restored = await templates.RestoreAsync(id, ct);
+            return restored is null ? NotFound() : Ok(restored);
         }
         catch (TemplateRequestException ex)
         {

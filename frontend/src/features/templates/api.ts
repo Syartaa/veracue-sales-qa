@@ -43,18 +43,28 @@ export type SaveTemplateRequest = {
 
 export const templateKeys = {
   all: ['templates'] as const,
-  list: (search: string) => ['templates', 'list', search] as const,
+  list: (search: string, archived = false) => ['templates', 'list', search, archived] as const,
   detail: (id: string) => ['templates', 'detail', id] as const,
 }
 
 // ---------- Hooks used by the pages ----------
 
-/** Active templates, optionally filtered. Keeps showing the old list while a new search loads. */
-export function useTemplates(search: string) {
+/** Active (or archived) templates, optionally filtered. Keeps showing the old list while a new one loads. */
+export function useTemplates(search: string, archived = false) {
   return useQuery({
-    queryKey: templateKeys.list(search),
-    queryFn: () => apiFetch<TemplateSummary[]>(`/api/templates?search=${encodeURIComponent(search)}`),
+    queryKey: templateKeys.list(search, archived),
+    queryFn: () =>
+      apiFetch<TemplateSummary[]>(`/api/templates?search=${encodeURIComponent(search)}&archived=${archived}`),
     placeholderData: keepPreviousData,
+  })
+}
+
+/** Makes an archived template active again (409 if an active template now uses its name). */
+export function useRestoreTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<TemplateDetail>(`/api/templates/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.all }),
   })
 }
 

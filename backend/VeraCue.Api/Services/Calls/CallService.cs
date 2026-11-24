@@ -128,6 +128,34 @@ public sealed class CallService(
         return new CallListDto(items, total, page, pageSize);
     }
 
+    /// <summary>
+    /// Overview numbers. The average uses REVIEWED calls only (as labelled in the UI): a score is
+    /// only trustworthy once a manager has checked it. Scores are calculated, never stored.
+    /// </summary>
+    public async Task<OverviewDto> OverviewAsync(CancellationToken ct)
+    {
+        var evaluated = await db.Calls.CountAsync(
+            c => c.Status == CallStatus.ReadyForReview || c.Status == CallStatus.Reviewed, ct);
+        var pending = await db.Calls.CountAsync(c => c.Status == CallStatus.ReadyForReview, ct);
+        var templates = await db.QaTemplates.CountAsync(t => !t.IsArchived, ct);
+
+        var reviewedPercents = (await db.CriterionResults.AsNoTracking()
+                .Where(r => r.Evaluation.Call.Status == CallStatus.Reviewed)
+                .Select(r => new { r.Evaluation.CallId, Input = new ScoreInput(r.MaxPoints, r.AiOutcome, r.AiScore, r.FinalOutcome, r.FinalScore) })
+                .ToListAsync(ct))
+            .GroupBy(x => x.CallId)
+            .Select(g => ScoreCalculator.Calculate(g.Select(x => x.Input).ToList()).Current.Percent)
+            .OfType<int>() // skip calls where nothing was scorable
+            .ToList();
+
+        int? average = reviewedPercents.Count == 0
+            ? null
+            : (int)Math.Round(reviewedPercents.Average(), MidpointRounding.AwayFromZero);
+
+        var recent = await ListAsync(new CallListQuery { Page = 1, PageSize = 4 }, ct);
+        return new OverviewDto(evaluated, average, pending, templates, recent.Items);
+    }
+
     /// <summary>A call's details, plus its calculated scores once it has been evaluated.</summary>
     public async Task<CallDetailDto?> GetAsync(Guid id, CancellationToken ct)
     {

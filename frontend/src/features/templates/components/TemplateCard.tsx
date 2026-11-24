@@ -1,4 +1,4 @@
-import { Layers, Pencil, Search, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { ArchiveRestore, Layers, Pencil, Search, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/format'
@@ -16,18 +16,27 @@ const PREVIEW_COUNT = 3
 type TemplateCardProps = {
   template: TemplateSummary
   index: number
+  /** Set for archived templates: the card shows "Restore" instead of Edit / Use template. */
+  onRestore?: () => void
+  restoring?: boolean
 }
 
-export function TemplateCard({ template, index }: TemplateCardProps) {
+export function TemplateCard({ template, index, onRestore, restoring }: TemplateCardProps) {
   const { icon: Icon, className: tint } = looks[index % looks.length]
   const preview = template.criteria.slice(0, PREVIEW_COUNT)
   const hiddenCount = template.criteria.length - preview.length
+  const archived = !!onRestore
 
   return (
-    <article className="flex flex-col rounded-3xl border bg-card p-5 shadow-xs">
-      <span className={`flex size-10 items-center justify-center rounded-xl ${tint}`}>
-        <Icon className="size-5" aria-hidden="true" />
-      </span>
+    <article className={`flex flex-col rounded-3xl border bg-card p-5 shadow-xs ${archived ? 'border-dashed' : ''}`}>
+      <div className="flex items-start justify-between gap-2">
+        <span className={`flex size-10 items-center justify-center rounded-xl ${archived ? 'bg-muted text-muted-foreground' : tint}`}>
+          <Icon className="size-5" aria-hidden="true" />
+        </span>
+        {archived && (
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">Archived</span>
+        )}
+      </div>
 
       <h2 className="mt-4 text-lg leading-snug font-bold">{template.name}</h2>
       {template.description && (
@@ -59,21 +68,30 @@ export function TemplateCard({ template, index }: TemplateCardProps) {
           </span>
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button asChild variant="outline">
-            <Link to={`/templates/${template.id}`} aria-label={`Edit ${template.name}`}>
-              <Pencil />
-              Edit
-            </Link>
+        {archived ? (
+          <Button variant="outline" className="mt-4 w-full" onClick={onRestore} disabled={restoring} aria-label={`Restore ${template.name}`}>
+            <ArchiveRestore />
+            {restoring ? 'Restoring…' : 'Restore'}
           </Button>
-          <Button asChild variant="secondary">
-            <Link to={`/evaluate?templateId=${template.id}`} aria-label={`Use ${template.name}`}>
-              Use template
-            </Link>
-          </Button>
-        </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button asChild variant="outline">
+              <Link to={`/templates/${template.id}`} aria-label={`Edit ${template.name}`}>
+                <Pencil />
+                Edit
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link to={`/evaluate?templateId=${template.id}`} aria-label={`Use ${template.name}`}>
+                Use template
+              </Link>
+            </Button>
+          </div>
+        )}
 
-        <p className="mt-3 text-xs text-muted-foreground">Updated {formatDate(template.updatedAt)}</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {archived ? 'Archived' : 'Updated'} {formatDate(template.updatedAt)}
+        </p>
       </div>
     </article>
   )
