@@ -1,6 +1,7 @@
 import { Pause, Play } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useImperativeHandle, useRef, useState, type Ref } from 'react'
-import { apiUrl } from '@/lib/api'
+import { apiFetch, apiUrl } from '@/lib/api'
 import { formatDuration } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { CriterionResult } from '../api'
@@ -30,6 +31,15 @@ const SPEEDS = [1, 1.25, 1.5, 2, 0.75]
  * Evidence markers sit on the timeline: orange for the selected criterion, lilac for the rest.
  */
 export function AudioPlayer({ ref, callId, durationMs, results, selectedId, onTimeChange }: AudioPlayerProps) {
+  // The recording is private: ask the API (signed in) for a link signed for this call,
+  // valid 30 minutes. Reused for 20 minutes, then fetched fresh.
+  const link = useQuery({
+    queryKey: ['calls', 'audio-url', callId],
+    queryFn: () => apiFetch<{ url: string; expiresAt: string }>(`/api/calls/${callId}/audio-url`),
+    staleTime: 20 * 60 * 1000,
+  })
+  const retriedLink = useRef(false)
+
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [currentMs, setCurrentMs] = useState(0)
@@ -68,7 +78,7 @@ export function AudioPlayer({ ref, callId, durationMs, results, selectedId, onTi
     <section className="mb-5 rounded-3xl border bg-card p-4 sm:p-5" aria-label="Call recording">
       <audio
         ref={audioRef}
-        src={apiUrl(`/api/calls/${callId}/audio`)}
+        src={link.data ? apiUrl(link.data.url) : undefined}
         preload="metadata"
         onLoadedMetadata={(e) => Number.isFinite(e.currentTarget.duration) && setTotalMs(e.currentTarget.duration * 1000)}
         onTimeUpdate={(e) => {
@@ -79,7 +89,15 @@ export function AudioPlayer({ ref, callId, durationMs, results, selectedId, onTi
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
-        onError={() => setLoadError(true)}
+        onError={() => {
+          // Most likely the signed link expired (page open > 30 min): get a fresh one, once.
+          if (link.data && !retriedLink.current) {
+            retriedLink.current = true
+            void link.refetch()
+          } else if (link.data) {
+            setLoadError(true)
+          }
+        }}
       />
 
       <div className="flex items-center gap-3 sm:gap-4">

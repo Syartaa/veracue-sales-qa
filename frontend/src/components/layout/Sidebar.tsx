@@ -1,5 +1,7 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { CloudUpload, Headphones, House, Layers, LogOut, type LucideIcon } from 'lucide-react'
-import { Link, NavLink } from 'react-router'
+import { NavLink, useNavigate } from 'react-router'
+import { clearSession } from '@/lib/session'
 import { cn } from '@/lib/utils'
 import { Logo } from './Logo'
 
@@ -20,6 +22,15 @@ const linkBase =
  * Mobile: stacks above the content; nav links become a horizontally scrolling row.
  */
 export function Sidebar() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const signOut = () => {
+    clearSession()
+    queryClient.clear() // forget all cached calls/templates, so nothing shows after signing out
+    navigate('/login', { replace: true })
+  }
+
   return (
     <aside className="flex shrink-0 flex-wrap items-center gap-4 border-b border-sidebar-border bg-sidebar p-4 md:sticky md:top-0 md:h-screen md:w-60 md:flex-col md:flex-nowrap md:items-stretch md:border-r md:border-b-0 md:p-5">
       <Logo />
@@ -48,14 +59,14 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      {/* Sign-in is built in Phase 6; for now this just opens the sign-in page. */}
-      <Link
-        to="/login"
+      <button
+        type="button"
+        onClick={signOut}
         className={cn(linkBase, 'ml-auto font-medium text-sidebar-foreground hover:bg-sidebar-accent/60 md:mt-auto md:ml-0')}
       >
         <LogOut className="size-5" aria-hidden="true" />
         Sign out
-      </Link>
+      </button>
     </aside>
   )
 }

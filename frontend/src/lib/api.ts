@@ -1,5 +1,6 @@
 // Small fetch wrapper for the VeraCue API. Every request goes through apiFetch,
-// so base URL, headers and error handling live in one place.
+// so base URL, the sign-in token, headers and error handling live in one place.
+import { clearSession, getSession, type Session } from './session'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000').replace(/\/$/, '')
 
@@ -26,16 +27,26 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getSession()?.token
+
   let response: Response
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers: { Accept: 'application/json', ...init?.headers },
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
     })
   } catch {
     // Network failure, backend not running, or blocked by CORS.
     throw new ApiError(0, 'Cannot reach the VeraCue API.')
   }
+
+  // Token missing, expired or rejected: end the session. The route guard (RequireAuth)
+  // notices and sends the user to the sign-in page, then back here afterwards.
+  if (response.status === 401 && token) clearSession()
 
   if (!response.ok) {
     const problem = (await response.json().catch(() => undefined)) as ProblemDetails | undefined
@@ -55,6 +66,15 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 /** Full URL for an API path, for places that can't use fetch (e.g. an <audio> element's src). */
 export function apiUrl(path: string) {
   return `${API_BASE_URL}${path}`
+}
+
+/** POST /api/auth/login — returns the session to store (token, expiry, user). */
+export function login(email: string, password: string) {
+  return apiFetch<Session>('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
 }
 
 /** GET /api/health — resolves to "Healthy" when the backend is up. */

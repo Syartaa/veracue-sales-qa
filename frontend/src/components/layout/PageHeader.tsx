@@ -1,7 +1,7 @@
-import { ArrowLeft, Bell } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { currentUser } from '@/lib/current-user'
+import { initials, useSession } from '@/lib/session'
 
 type PageHeaderProps = {
   title: string
@@ -12,11 +12,13 @@ type PageHeaderProps = {
   back?: { to: string; label: string }
   /** The page's main action(s), shown on the right. */
   actions?: ReactNode
-  /** "full" shows the bell, name and role (Overview); "compact" shows only the avatar. */
+  /** "full" shows the name and email next to the avatar (Overview); "compact" shows only the avatar. */
   profile?: 'compact' | 'full'
 }
 
 export function PageHeader({ title, description, eyebrow, back, actions, profile = 'compact' }: PageHeaderProps) {
+  const user = useSession()?.user // the signed-in manager, from the session
+
   return (
     <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
@@ -36,32 +38,23 @@ export function PageHeader({ title, description, eyebrow, back, actions, profile
 
       <div className="flex shrink-0 items-center gap-3">
         {actions}
-        {profile === 'full' && (
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="flex size-10 items-center justify-center rounded-xl border border-border bg-card text-heading shadow-xs hover:bg-accent"
-          >
-            <Bell className="size-5" aria-hidden="true" />
-          </button>
-        )}
-        <div className="flex items-center gap-2.5">
-          <span
-            className="flex size-10 items-center justify-center rounded-full bg-lavender-strong text-sm font-bold text-heading"
-            aria-label={currentUser.name}
-            title={currentUser.name}
-          >
-            {currentUser.initials}
-          </span>
-          {profile === 'full' && (
-            <span className="hidden leading-tight sm:block">
-              <span className="block text-sm font-bold text-heading">{currentUser.name}</span>
-              {currentUser.role !== currentUser.name && (
-                <span className="block text-xs text-muted-foreground">{currentUser.role}</span>
-              )}
+        {user && (
+          <div className="flex items-center gap-2.5">
+            <span
+              className="flex size-10 items-center justify-center rounded-full bg-lavender-strong text-sm font-bold text-heading"
+              aria-label={`Signed in as ${user.displayName}`}
+              title={`${user.displayName} (${user.email})`}
+            >
+              {initials(user.displayName)}
             </span>
-          )}
-        </div>
+            {profile === 'full' && (
+              <span className="hidden leading-tight sm:block">
+                <span className="block text-sm font-bold text-heading">{user.displayName}</span>
+                <span className="block text-xs text-muted-foreground">{user.email}</span>
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </header>
   )
