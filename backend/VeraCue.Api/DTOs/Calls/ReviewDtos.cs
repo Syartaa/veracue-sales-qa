@@ -64,7 +64,14 @@ public sealed record CriterionResultDto(
     string? OverrideReason,
     string? OverriddenByName,
     DateTime? OverriddenAt,
-    IReadOnlyList<EvidenceDto> Evidence);
+    IReadOnlyList<EvidenceDto> Evidence,
+    uint Version); // concurrency token: sent back with an override so a stale page can't overwrite a newer one
+
+/// <summary>
+/// Body of PUT /api/calls/{id}/results/{resultId}/override.
+/// Nullable so missing values reach OverrideValidator and get friendly, field-level messages.
+/// </summary>
+public sealed record OverrideRequest(CriterionOutcome? Outcome, int? Score, string? Reason, uint? Version);
 
 /// <summary>A cited transcript segment: enough to show "03:12 · Agent" and to seek the audio.</summary>
 public sealed record EvidenceDto(Guid SegmentId, int SegmentIndex, int StartMs, short Speaker);

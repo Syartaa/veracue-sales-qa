@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using VeraCue.Api.DTOs.Calls;
+using VeraCue.Api.Services;
 using VeraCue.Api.Services.Calls;
 
 namespace VeraCue.Api.Controllers;
@@ -7,7 +8,7 @@ namespace VeraCue.Api.Controllers;
 /// <summary>Uploading call recordings and following their processing.</summary>
 [ApiController]
 [Route("api/calls")]
-public class CallsController(CallService calls, ReviewService reviews) : ControllerBase
+public class CallsController(CallService calls, ReviewService reviews, CurrentUser currentUser) : ControllerBase
 {
     // A little above 100 MB, to leave room for the other form fields around the file.
     private const long MaxRequestBytes = CallUploadValidator.MaxFileBytes + 1024 * 1024;
@@ -29,7 +30,7 @@ public class CallsController(CallService calls, ReviewService reviews) : Control
 
         if (errors.Count > 0) return ValidationProblem(new ValidationProblemDetails(errors));
 
-        var uploaderId = await calls.GetUploaderIdAsync(ct);
+        var uploaderId = await currentUser.GetIdAsync(ct);
         if (uploaderId is null)
         {
             return Problem(
@@ -41,6 +42,48 @@ public class CallsController(CallService calls, ReviewService reviews) : Control
         var call = await calls.UploadAsync(request, uploaderId.Value, ct);
         return AcceptedAtAction(nameof(Get), new { id = call.Id }, call);
     }
+
+    /// <summary>GET /api/calls?search=&amp;status=&amp;templateId=&amp;page=&amp;pageSize= — Call History.</summary>
+    [HttpGet]
+    public async Task<ActionResult<CallListDto>> List([FromQuery] CallListQuery query, CancellationToken ct) =>
+        Ok(await calls.ListAsync(query, ct));
+
+    /// <summary>
+    /// PUT /api/calls/{id}/results/{resultId}/override — a manager's decision for one criterion.
+    /// 200 with the updated review, 400 invalid, 404, 409 when locked or changed elsewhere.
+    /// </summary>
+    [HttpPut("{id:guid}/results/{resultId:guid}/override")]
+    public async Task<ActionResult<CallReviewDto>> Override(Guid id, Guid resultId, OverrideRequest request, CancellationToken ct)
+    {
+        if (await currentUser.GetIdAsync(ct) is not { } userId) return DemoAccountMissing();
+        return ToResponse(await reviews.OverrideAsync(id, resultId, request, userId, ct));
+    }
+
+    /// <summary>DELETE /api/calls/{id}/results/{resultId}/override?version= — undo an override.</summary>
+    [HttpDelete("{id:guid}/results/{resultId:guid}/override")]
+    public async Task<ActionResult<CallReviewDto>> ClearOverride(Guid id, Guid resultId, [FromQuery] uint? version, CancellationToken ct) =>
+        ToResponse(await reviews.ClearOverrideAsync(id, resultId, version, ct));
+
+    /// <summary>POST /api/calls/{id}/mark-reviewed — only when no criterion is pending; locks the review.</summary>
+    [HttpPost("{id:guid}/mark-reviewed")]
+    public async Task<ActionResult<CallReviewDto>> MarkReviewed(Guid id, CancellationToken ct)
+    {
+        if (await currentUser.GetIdAsync(ct) is not { } userId) return DemoAccountMissing();
+        return ToResponse(await reviews.MarkReviewedAsync(id, userId, ct));
+    }
+
+    private ActionResult<CallReviewDto> ToResponse(ReviewActionResult result) => result.Status switch
+    {
+        ReviewActionStatus.Ok => Ok(result.Review),
+        ReviewActionStatus.NotFound => NotFound(),
+        ReviewActionStatus.Invalid => ValidationProblem(new ValidationProblemDetails(result.Errors!)),
+        _ => Problem(title: "Can't change this review", detail: result.Message, statusCode: StatusCodes.Status409Conflict),
+    };
+
+    private ObjectResult DemoAccountMissing() => Problem(
+        title: "Demo account missing",
+        detail: "The demo manager account hasn't been created. Set DEMO_MANAGER_PASSWORD on the server and restart it.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
 
     /// <summary>GET /api/calls/{id} — status and details, polled by the Processing page.</summary>
     [HttpGet("{id:guid}")]

@@ -21,13 +21,6 @@ public sealed class CallService(
         db.QaTemplates.AnyAsync(t => t.Id == templateId && !t.IsArchived, ct);
 
     /// <summary>
-    /// Until sign-in exists (Phase 6), every call is uploaded by the single demo manager.
-    /// Null if that account hasn't been created (DEMO_MANAGER_PASSWORD missing).
-    /// </summary>
-    public async Task<Guid?> GetUploaderIdAsync(CancellationToken ct) =>
-        await db.Users.Where(u => u.Email == DemoUserSeeder.Email).Select(u => (Guid?)u.Id).FirstOrDefaultAsync(ct);
-
-    /// <summary>
     /// Stores the recording privately, records the call as "Uploaded" and queues it.
     /// Returns immediately; transcription happens in the background worker.
     /// Expects a request that already passed CallUploadValidator.
@@ -77,6 +70,62 @@ public sealed class CallService(
         logger.LogInformation("Call {CallId} uploaded ({Bytes} bytes) and queued", call.Id, call.FileSizeBytes);
 
         return (await GetAsync(call.Id, ct))!;
+    }
+
+    /// <summary>
+    /// Call History: newest first, with optional title search, status and template filters,
+    /// and pagination. Scores are calculated (never stored) for the calls on the current page.
+    /// </summary>
+    public async Task<CallListDto> ListAsync(CallListQuery query, CancellationToken ct)
+    {
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 50);
+        var calls = db.Calls.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var pattern = $"%{query.Search.Trim().Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_")}%";
+            calls = calls.Where(c => EF.Functions.ILike(c.Title, pattern, @"\"));
+        }
+
+        if (query.TemplateId is { } templateId)
+            calls = calls.Where(c => c.TemplateId == templateId);
+
+        if (query.Status == "InProgress")
+        {
+            CallStatus[] inProgress = [CallStatus.Uploaded, CallStatus.Transcribing, CallStatus.Transcribed, CallStatus.Evaluating];
+            calls = calls.Where(c => inProgress.Contains(c.Status));
+        }
+        else if (Enum.TryParse<CallStatus>(query.Status, ignoreCase: true, out var status))
+        {
+            calls = calls.Where(c => c.Status == status);
+        }
+
+        var total = await calls.CountAsync(ct);
+        var rows = await calls
+            .OrderByDescending(c => c.UploadedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new { c.Id, c.Title, c.TemplateId, TemplateName = c.Template.Name, c.DurationMs, c.Status, c.FailedStage, c.UploadedAt })
+            .ToListAsync(ct);
+
+        // One query for the results of all calls on this page, then the calculator per call.
+        var ids = rows.Select(r => r.Id).ToList();
+        var resultsByCall = (await db.CriterionResults.AsNoTracking()
+                .Where(r => ids.Contains(r.Evaluation.CallId))
+                .Select(r => new { r.Evaluation.CallId, Input = new ScoreInput(r.MaxPoints, r.AiOutcome, r.AiScore, r.FinalOutcome, r.FinalScore) })
+                .ToListAsync(ct))
+            .GroupBy(x => x.CallId)
+            .ToDictionary(g => g.Key, g => ScoreCalculator.Calculate(g.Select(x => x.Input).ToList()));
+
+        var items = rows.Select(r =>
+        {
+            var score = resultsByCall.GetValueOrDefault(r.Id);
+            return new CallListItemDto(r.Id, r.Title, r.TemplateId, r.TemplateName, r.DurationMs, r.Status, r.FailedStage,
+                score?.Ai.Percent, score?.Current.Percent, score?.OverrideCount ?? 0, score?.PendingCount ?? 0, r.UploadedAt);
+        }).ToList();
+
+        return new CallListDto(items, total, page, pageSize);
     }
 
     /// <summary>A call's details, plus its calculated scores once it has been evaluated.</summary>

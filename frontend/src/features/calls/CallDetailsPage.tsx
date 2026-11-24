@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
 import { formatDuration, formatTime } from '@/lib/format'
 import { useCall, useRetryCall, type CallDetail } from './api'
-import { ResultsPreview } from './components/ResultsPreview'
 import { StageTiles } from './components/StageTiles'
+import { ReviewPage } from './review/ReviewPage'
 
 /**
  * /calls/:callId
@@ -56,19 +56,8 @@ export function CallDetailsPage() {
     )
   }
 
-  if (isFinished && (reviewOpened || !sawProcessing)) {
-    return (
-      <>
-        <PageHeader
-          back={{ to: '/calls', label: 'Call History' }}
-          title={call.title}
-          description={`${call.templateName}${call.durationMs ? ` · ${formatDuration(call.durationMs)}` : ''}`}
-          actions={<StatusChip status={call.status} />}
-        />
-        <ResultsPreview callId={call.id} />
-      </>
-    )
-  }
+  if (isFinished && (reviewOpened || !sawProcessing)) return <ReviewPage callId={call.id} />
+
 
   return <ProcessingView call={call} onOpenReview={() => setReviewOpened(true)} />
 }

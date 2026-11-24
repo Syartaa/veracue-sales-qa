@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CallStatus } from '@/components/StatusChip'
 import { apiFetch } from '@/lib/api'
 
@@ -57,6 +57,8 @@ export type CriterionResult = {
   overriddenByName: string | null
   overriddenAt: string | null
   evidence: Evidence[]
+  /** Concurrency token, sent back with an override. */
+  version: number
 }
 
 export type Score = {
@@ -109,6 +111,50 @@ export const callKeys = {
   review: (id: string) => ['calls', 'review', id] as const,
 }
 
+// ---------- Call History (GET /api/calls) ----------
+
+export type CallListItem = {
+  id: string
+  title: string
+  templateId: string
+  templateName: string
+  durationMs: number | null
+  status: CallStatus
+  failedStage: ProcessingStage | null
+  aiScorePercent: number | null
+  currentScorePercent: number | null
+  overrideCount: number
+  pendingCount: number
+  uploadedAt: string
+}
+
+export type CallList = { items: CallListItem[]; total: number; page: number; pageSize: number }
+
+export type CallListQuery = {
+  search: string
+  status: '' | 'InProgress' | 'ReadyForReview' | 'Reviewed' | 'Failed'
+  templateId: string
+  page: number
+}
+
+export const CALL_PAGE_SIZE = 8
+
+/** Newest first, filtered and paged by the API. Keeps the old page visible while the next loads. */
+export function useCalls(query: CallListQuery) {
+  const params = new URLSearchParams({ page: String(query.page), pageSize: String(CALL_PAGE_SIZE) })
+  if (query.search) params.set('search', query.search)
+  if (query.status) params.set('status', query.status)
+  if (query.templateId) params.set('templateId', query.templateId)
+
+  return useQuery({
+    queryKey: ['calls', 'list', query],
+    queryFn: () => apiFetch<CallList>(`/api/calls?${params}`),
+    placeholderData: keepPreviousData,
+    // While any visible call is still processing, refresh so its status and score appear by themselves.
+    refetchInterval: (q) => (q.state.data?.items.some((c) => IN_PROGRESS.includes(c.status)) ? 5000 : false),
+  })
+}
+
 /** Transcript, AI results with evidence and scores. Read-only: never re-runs the AI. */
 export function useCallReview(id: string | undefined, enabled = true) {
   return useQuery({
@@ -151,6 +197,58 @@ export function useCall(id: string | undefined) {
       return status && IN_PROGRESS.includes(status) ? 3000 : false
     },
   })
+}
+
+export type OverrideInput = {
+  resultId: string
+  outcome: Exclude<CriterionOutcome, 'NeedsReview'>
+  score: number | null
+  reason: string
+  version: number
+}
+
+/**
+ * Manager actions on a review. The API answers with the whole updated review, which goes
+ * straight into the cache, so scores and cards refresh without an extra request.
+ */
+function useReviewAction<TInput>(callId: string, request: (input: TInput) => Promise<CallReview>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: request,
+    onSuccess: (review) => {
+      queryClient.setQueryData(callKeys.review(callId), review)
+      queryClient.setQueryData(callKeys.detail(callId), review.call)
+      return queryClient.invalidateQueries({ queryKey: ['calls', 'list'] })
+    },
+  })
+}
+
+export function useOverride(callId: string) {
+  return useReviewAction(callId, ({ resultId, ...body }: OverrideInput) =>
+    apiFetch<CallReview>(`/api/calls/${callId}/results/${resultId}/override`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
+export function useClearOverride(callId: string) {
+  return useReviewAction(callId, ({ resultId, version }: { resultId: string; version: number }) =>
+    apiFetch<CallReview>(`/api/calls/${callId}/results/${resultId}/override?version=${version}`, { method: 'DELETE' }),
+  )
+}
+
+export function useMarkReviewed(callId: string) {
+  return useReviewAction(callId, () => apiFetch<CallReview>(`/api/calls/${callId}/mark-reviewed`, { method: 'POST' }))
+}
+
+/** The manager's decision if there is one, otherwise the AI's. */
+export function effectiveOutcome(r: CriterionResult): CriterionOutcome {
+  return r.finalOutcome ?? r.aiOutcome
+}
+export function effectiveScore(r: CriterionResult): number | null {
+  return r.finalOutcome ? r.finalScore : r.aiScore
 }
 
 export function useRetryCall(id: string) {

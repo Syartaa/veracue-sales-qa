@@ -52,6 +52,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return (contentType.includes('json') ? await response.json() : await response.text()) as T
 }
 
+/** Full URL for an API path, for places that can't use fetch (e.g. an <audio> element's src). */
+export function apiUrl(path: string) {
+  return `${API_BASE_URL}${path}`
+}
+
 /** GET /api/health — resolves to "Healthy" when the backend is up. */
 export function checkHealth() {
   return apiFetch<string>('/api/health', { headers: { Accept: 'text/plain' } })

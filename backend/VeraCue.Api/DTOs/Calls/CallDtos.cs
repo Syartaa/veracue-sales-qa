@@ -14,6 +14,36 @@ public sealed class UploadCallRequest
     public bool PermissionConfirmed { get; set; }
 }
 
+/// <summary>Query string of GET /api/calls (Call History).</summary>
+public sealed class CallListQuery
+{
+    public string? Search { get; set; }
+
+    /// <summary>A CallStatus name, or "InProgress" for Uploaded/Transcribing/Transcribed/Evaluating.</summary>
+    public string? Status { get; set; }
+
+    public Guid? TemplateId { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 8;
+}
+
+/// <summary>One row of Call History.</summary>
+public sealed record CallListItemDto(
+    Guid Id,
+    string Title,
+    Guid TemplateId,
+    string TemplateName,
+    int? DurationMs,
+    CallStatus Status,
+    ProcessingStage? FailedStage,
+    int? AiScorePercent,
+    int? CurrentScorePercent,
+    int OverrideCount,
+    int PendingCount,
+    DateTime UploadedAt);
+
+public sealed record CallListDto(IReadOnlyList<CallListItemDto> Items, int Total, int Page, int PageSize);
+
 /// <summary>A call and its processing state, for the Processing page (and later Call History).</summary>
 public sealed record CallDetailDto(
     Guid Id,
