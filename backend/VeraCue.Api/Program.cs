@@ -1,6 +1,12 @@
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using VeraCue.Api.Services.Auth;
 using VeraCue.Api.Data;
 using VeraCue.Api.Services;
 using VeraCue.Api.Services.Calls;
@@ -39,6 +45,56 @@ builder.Services.AddScoped<TemplateService>();
 
 // Private recording storage on a persistent disk (Render Disk in production).
 builder.Services.AddSingleton<AudioStorage>();
+
+// ---------- Sign-in (JWT) ----------
+// The browser signs in once (POST /api/auth/login) and sends the signed token with every request:
+//   Authorization: Bearer <token>
+// Tokens instead of cookies because the website (vercel.app) and API (onrender.com) are
+// different sites, and browsers increasingly block cookies between sites.
+var authSettings = new AuthSettings(builder.Configuration); // fails fast if JWT_SIGNING_KEY is missing
+builder.Services.AddSingleton(authSettings);
+builder.Services.AddSingleton<TokenService>();
+builder.Services.AddSingleton<AudioLinkSigner>();
+builder.Services.AddHttpContextAccessor();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false; // keep the standard claim names ("sub", "email", "name")
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = AuthSettings.Issuer,
+            ValidAudience = AuthSettings.Audience,
+            IssuerSigningKey = authSettings.SigningKey,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+        };
+    });
+
+// Secure by default: EVERY endpoint requires a signed-in user unless it explicitly opts out
+// with [AllowAnonymous] (only login, the health checks and signed audio links do).
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
+// Slow down password guessing: at most 5 sign-in attempts per minute per IP address.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("login", http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
+});
+
+// On Render, requests arrive through Render's proxy: read the real visitor IP (for the
+// rate limit) and scheme from the X-Forwarded-* headers the proxy adds.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear(); // the container is only reachable through Render's proxy
+    options.KnownProxies.Clear();
+});
 
 // Calls: upload/status service, plus the background pipeline that transcribes them.
 // Queue = singleton (one shared list); worker = hosted service that runs for the app's lifetime.
@@ -117,10 +173,12 @@ if (applyMigrations)
     app.Logger.LogInformation("Database is up to date.");
 }
 
-// The demo manager account (needed as the uploader of every call until sign-in exists).
+// The demo manager account — the one account that can sign in.
 await DemoUserSeeder.SeedAsync(app.Services, app.Configuration, app.Logger);
 
 // ---------- HTTP pipeline (order matters) ----------
+
+app.UseForwardedHeaders(); // first: everything after sees the real visitor IP
 
 // Unhandled exceptions -> 500 ProblemDetails; empty error responses (404, 405...) -> ProblemDetails.
 app.UseExceptionHandler();
@@ -128,24 +186,26 @@ app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi(); // GET /openapi/v1.json
+    app.MapOpenApi().AllowAnonymous(); // GET /openapi/v1.json
 }
 
 // No UseHttpsRedirection: locally we use plain http, and on Render HTTPS is
 // handled by Render's proxy in front of the container.
 
-app.UseCors();
-app.UseAuthorization();
+app.UseCors();           // before auth, so browser preflight requests (no token) are answered
+app.UseRateLimiter();
+app.UseAuthentication(); // who is it? (reads and verifies the token)
+app.UseAuthorization();  // may they? (the fallback policy requires sign-in)
 
 app.MapControllers();
 app.MapHealthChecks("/api/health", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("db"),
-});
+}).AllowAnonymous(); // Render's health check has no token
 app.MapHealthChecks("/api/health/providers", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("providers"),
     ResponseWriter = HealthResponseWriter.WriteJson,
-});
+}).AllowAnonymous();
 
 app.Run();

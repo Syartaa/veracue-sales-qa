@@ -1,24 +1,22 @@
-using Microsoft.EntityFrameworkCore;
-using VeraCue.Api.Data;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace VeraCue.Api.Services;
 
 /// <summary>
-/// Who is doing this request — used for "uploaded by", "overridden by" and "reviewed by".
-/// Until sign-in exists (Phase 6) that is always the single demo manager; Phase 6 changes only
-/// this class to read the signed-in user instead, and every caller keeps working.
+/// Who is making this request — used for "uploaded by", "overridden by" and "reviewed by".
+/// Read from the signed sign-in token ("sub" claim), which the API has already verified.
+/// Every endpoint that uses it requires sign-in, so the id is always present there.
 /// </summary>
-public sealed class CurrentUser(AppDbContext db)
+public sealed class CurrentUser(IHttpContextAccessor http)
 {
-    private Guid? _cachedId;
-
-    /// <summary>The user's id, or null if the demo account hasn't been created (DEMO_MANAGER_PASSWORD missing).</summary>
-    public async Task<Guid?> GetIdAsync(CancellationToken ct)
+    public Guid Id
     {
-        _cachedId ??= await db.Users
-            .Where(u => u.Email == DemoUserSeeder.Email)
-            .Select(u => (Guid?)u.Id)
-            .FirstOrDefaultAsync(ct);
-        return _cachedId;
+        get
+        {
+            var sub = http.HttpContext?.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+            return Guid.TryParse(sub, out var id)
+                ? id
+                : throw new InvalidOperationException("No signed-in user for this request.");
+        }
     }
 }
