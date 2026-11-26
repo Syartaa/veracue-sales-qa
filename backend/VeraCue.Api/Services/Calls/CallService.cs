@@ -147,6 +147,7 @@ public sealed class CallService(
             .Select(g => ScoreCalculator.Calculate(g.Select(x => x.Input).ToList()).Current.Percent)
             .OfType<int>() // skip calls where nothing was scorable
             .ToList();
+            
 
         int? average = reviewedPercents.Count == 0
             ? null

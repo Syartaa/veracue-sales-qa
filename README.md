@@ -3,7 +3,6 @@
 VeraCue evaluates recorded sales calls against your own QA criteria. Upload a call, get a transcript
 and an AI scorecard with evidence from the call, then review and override any score.
 
-Built for the AMANET Full-Stack Developer take-home assignment.
 
 **Live app:** https://veracue.vercel.app (demo login provided with the submission)
 
@@ -25,27 +24,3 @@ Built for the AMANET Full-Stack Developer take-home assignment.
 | Database | PostgreSQL (Neon) |
 | AI | Deepgram Nova-3 (transcription), Groq `gpt-oss-120b` (evaluation) |
 
-## Running locally
-
-Requires the .NET 10 SDK, Node.js 22, a PostgreSQL database, and Deepgram and Groq API keys.
-Keys are stored with .NET User Secrets, never in the repository.
-
-```powershell
-# Backend: http://localhost:5000
-cd backend
-dotnet tool restore
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection string>" --project VeraCue.Api
-dotnet user-secrets set "DEEPGRAM_API_KEY" "<key>" --project VeraCue.Api
-dotnet user-secrets set "GROQ_API_KEY" "<key>" --project VeraCue.Api
-dotnet user-secrets set "JWT_SIGNING_KEY" "<random string, 32+ characters>" --project VeraCue.Api
-dotnet user-secrets set "DEMO_MANAGER_PASSWORD" "<password>" --project VeraCue.Api
-dotnet ef database update --project VeraCue.Api
-dotnet run --project VeraCue.Api
-
-# Frontend: http://localhost:5173
-cd frontend
-npm ci
-npm run dev
-```
-
-Run the tests with `dotnet test` in the `backend` folder.
